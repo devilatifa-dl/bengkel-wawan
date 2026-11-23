@@ -1,5 +1,9 @@
 # Panduan Deploy Gratis Permanen ? Cloudflare Pages
 
+> **Status: SUDAH LIVE** ? https://bengkel-wawan.pages.dev
+> Project Cloudflare Pages: `bengkel-wawan` (akun latifadevii@gmail.com)
+> Deploy berikutnya cukup: `cd frontend && yarn build && npx wrangler pages deploy build --project-name bengkel-wawan`
+
 Aplikasi ini **tidak butuh server, database, atau API key**. Semua data tersimpan di HP pengguna (IndexedDB).
 Artinya cukup hosting statis ? **gratis selamanya**.
 
