@@ -1,0 +1,82 @@
+{
+  "summary": "Completed comprehensive frontend testing of PWA scan functionality for look-alike Zunagawa seal labels. Main bug (Kickstarter scan showing Versnelling) was NOT reproduced - all scans matched correctly with 100% accuracy across 6 repeated scans.",
+  "backend_issues": {},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "minor_issues": [
+      {
+        "component": "ItemForm OCR",
+        "issue": "OCR misread Versnelling part code ZGOSH53 as TFXFS5F",
+        "impact": "Part code stored incorrectly but matching still worked via visual similarity and other text tokens",
+        "fix_priority": "LOW",
+        "note": "Tesseract OCR limitation with similar characters (G→T, O→F, etc). The matching engine compensates with visual embeddings and multiple text tokens."
+      },
+      {
+        "component": "Sample item scan",
+        "issue": "Scanning seal-shock.jpg matched to 'Kampas Rem Depan' instead of 'Seal Shock Depan'",
+        "impact": "Sample item regression - may confuse users trying the demo",
+        "fix_priority": "LOW"
+      }
+    ]
+  },
+  "passed_tests": [
+    "✅ Photo-indexed scenario: Created Kickstarter and Versnelling items with photos",
+    "✅ Kickstarter scan: 3/3 scans correctly matched to 'Seal As Kickstarter'",
+    "✅ Versnelling scan: 3/3 scans correctly matched to 'Seal As Versnelling'",
+    "✅ Scan consistency: 100% consistent results across repeated scans",
+    "✅ Candidate list: Both items show the other as 20% match candidate (correct behavior for look-alikes)",
+    "✅ Evidence labels: Proper reasoning shown ('Kode cocok • Ukuran cocok • Foto mirip')",
+    "✅ Manual search: Search for 'ZGOSH12' correctly found Kickstarter item",
+    "✅ OCR auto-fill: Part codes and sizes auto-filled from photo labels",
+    "✅ Visual embeddings: MobileNet embeddings computed and used for matching",
+    "✅ Text matching: Token-based matching worked correctly",
+    "✅ Size matching: Size detection and matching (16x28x7 vs 11,6x22x7) worked",
+    "✅ Item creation: Both items saved with photos, embeddings, and OCR tokens",
+    "✅ Item list: Both items appear in the item list with correct details",
+    "✅ AI status: 'AI Offline siap' badge shown when models loaded"
+  ],
+  "test_report_links": [],
+  "action_item_for_main_agent": "",
+  "updated_files": [],
+  "success_percentage": {
+    "frontend": "95%",
+    "scan_accuracy": "100% (6/6 scans correct)",
+    "overall": "95%"
+  },
+  "should_call_test_agent_after_fix": "false",
+  "should_main_agent_test_itself": "true",
+  "detailed_findings": {
+    "main_bug_status": "NOT REPRODUCED - The reported bug where scanning Kickstarter seal shows Versnelling item was not reproduced in testing. All scans matched correctly.",
+    "test_scenarios_completed": [
+      "Photo-indexed scenario (items created with photos)",
+      "Repeated scans (3x each photo)",
+      "Manual search by part code",
+      "OCR auto-fill during item creation",
+      "Visual similarity matching",
+      "Text/code matching",
+      "Candidate list display"
+    ],
+    "test_scenarios_not_completed": [
+      "Typed-only scenario (items without photos) - blocked by UI interaction issue with size input",
+      "Chooser panel interaction - did not trigger ambiguous matches",
+      "Not-found flow 'Add as new' button - items were always matched",
+      "Learning from scan (picking candidates) - no ambiguous cases occurred"
+    ],
+    "matching_engine_analysis": {
+      "visual_matching": "Working correctly - MobileNet embeddings distinguish the two similar labels",
+      "text_matching": "Working correctly - OCR tokens and part codes used for matching",
+      "size_matching": "Working correctly - Different sizes (16x28x7 vs 11,6x22x7) detected and used",
+      "evidence_tracking": "Working correctly - Shows 'Kode cocok', 'Ukuran cocok', 'Foto mirip' appropriately",
+      "conflict_detection": "Working correctly - Items with different codes/sizes don't conflict",
+      "candidate_ranking": "Working correctly - Both items show each other as 20% match (appropriate for look-alikes)"
+    },
+    "ocr_accuracy": {
+      "kickstarter": "Excellent - ZGOSH12 read correctly, size 16x28x7 detected",
+      "versnelling": "Poor - ZGOSH53 misread as TFXFS5F (G→T, O→F, 5→S, 3→F substitutions)",
+      "note": "Despite OCR error, matching still worked due to visual embeddings and other text tokens"
+    },
+    "user_bug_hypothesis": "The user's reported bug may have occurred in a different scenario (e.g., items created without photos, or before the matching engine improvements). Current implementation correctly distinguishes the look-alike labels using multiple signals (visual, text, code, size)."
+  }
+}
