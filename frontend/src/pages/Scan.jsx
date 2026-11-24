@@ -6,7 +6,7 @@ import {
   X, Camera, Image as ImageIcon, Zap, ZapOff, Search, ScanLine, Loader2, CheckCircle2, AlertCircle,
   PackagePlus, RotateCcw, Cpu, Type, Sparkles,
 } from "lucide-react";
-import { db, recordCheck, searchItems, isLowStock, learnFromScan } from "../lib/db";
+import { db, recordCheck, searchItems, isLowStock, learnFromScan, liveItems } from "../lib/db";
 import { computeEmbedding, runOcr } from "../lib/ai";
 import { rankItems, decide, formatSize, evidenceLabel } from "../lib/match";
 import { prepareVision, prepareOcr, subscribeAI } from "../lib/aiStatus";
@@ -56,7 +56,7 @@ export default function Scan({ initialMode = "camera" }) {
   const [query, setQuery] = useState("");
   const runIdRef = useRef(0);
 
-  const items = useLiveQuery(() => db.items.toArray(), [], []);
+  const items = useLiveQuery(() => liveItems().toArray(), [], []);
 
   useEffect(() => subscribeAI(setAi), []);
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function Scan({ initialMode = "camera" }) {
       setResult(null);
       setSteps({ vision: "run", ocr: "run", match: "pending" });
       setProgress(8);
-      const all = await db.items.toArray();
+      const all = await liveItems().toArray();
 
       let emb = null;
       let ocr = null;

@@ -1,116 +1,163 @@
-import asyncio
-from contextlib import suppress
-from fastapi import FastAPI, APIRouter, Query
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import ASCENDING, DESCENDING, IndexModel
+"""API sinkronisasi Bengkel & Toko Sparepart Motor.
+
+Aplikasi tetap offline-first: data utama disimpan di IndexedDB HP/laptop.
+Endpoint di sini hanya menyimpan salinan terpusat agar beberapa perangkat
+(HP + laptop) melihat data yang sama.
+
+Model sinkronisasi: last-write-wins berdasarkan `updatedAt` (epoch ms).
+Item yang dihapus memakai soft delete (`deleted: true`) agar penghapusan
+ikut tersinkron ke perangkat lain.
+"""
 import os
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
+from fastapi import APIRouter, FastAPI, HTTPException, Query
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field
+from starlette.middleware.cors import CORSMiddleware
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+MONGO_URL = os.environ.get("MONGO_URL", "")
+DB_NAME = os.environ.get("DB_NAME", "bengkel")
 
-# One entry per collection: every field a route filters, sorts or dedupes on. Add the index in the same edit as the query.
-INDEXES: dict[str, list[IndexModel]] = {
-    "status_checks": [
-        IndexModel([("id", ASCENDING)], name="id", unique=True),
-        IndexModel([("timestamp", DESCENDING)], name="timestamp_desc"),
-    ],
-}
+client: Optional[AsyncIOMotorClient] = None
+db = None
+if MONGO_URL:
+    client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=8000)
+    db = client[DB_NAME]
+
+logger = logging.getLogger("bengkel")
 
 
-async def ensure_indexes() -> None:
-    for collection, models in INDEXES.items():
-        for model in models:  # one at a time so a bad spec skips only itself
-            try:
-                await db[collection].create_indexes([model])
-            except Exception as exc:  # never block boot on an index; the log line names what to fix
-                logging.getLogger(__name__).error("ensure_indexes(%s.%s): %s", collection, model.document["name"], exc)
-
-# Create the main app without a prefix
-app = FastAPI()
-
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+def now_ms() -> int:
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
 
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if db is not None:
+        try:
+            await db.items.create_index("id", unique=True)
+            await db.items.create_index("updatedAt")
+            await db.settings.create_index("key", unique=True)
+            logger.info("Index siap pada database %s", DB_NAME)
+        except Exception as exc:  # jangan gagalkan boot karena index
+            logger.error("Gagal membuat index: %s", exc)
+    yield
+    if client is not None:
+        client.close()
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
+app = FastAPI(title="Bengkel Sparepart Sync API", lifespan=lifespan)
+api = APIRouter(prefix="/api")
+
+
+class ItemIn(BaseModel):
+    id: str
+    name: str = ""
+    partCode: str = ""
+    brand: str = ""
+    size: str = ""
+    compatibility: str = ""
+    costPrice: float = 0
+    sellPrice: float = 0
+    stock: Optional[float] = None
+    photo: Optional[str] = None          # data URL (base64) atau null
+    ocrTokens: Optional[List[str]] = None
+    ocrSizes: Optional[List[List[float]]] = None
+    ocrAt: Optional[int] = None
+    isSample: int = 0
+    createdAt: Optional[int] = None
+    lastCheckedAt: Optional[int] = None
+    updatedAt: int = 0
+    deleted: bool = False
+
+
+class PushIn(BaseModel):
+    items: List[ItemIn] = Field(default_factory=list)
+    settings: Dict[str, Any] = Field(default_factory=dict)
+
+
+def require_db():
+    if db is None:
+        raise HTTPException(503, "Database belum dikonfigurasi (MONGO_URL kosong)")
+
+
+@api.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "API sinkronisasi Bengkel & Toko Sparepart Motor"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks(limit: int = Query(20, ge=1, le=100)):
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+@api.get("/health")
+async def health():
+    ok = False
+    if db is not None:
+        try:
+            await db.command("ping")
+            ok = True
+        except Exception:
+            ok = False
+    return {"ok": ok, "db": DB_NAME if db is not None else None, "ts": now_ms()}
 
-# Include the router in the main app
-app.include_router(api_router)
 
+@api.get("/sync/pull")
+async def pull(since: int = Query(0, ge=0), limit: int = Query(500, ge=1, le=2000)):
+    """Ambil item yang berubah setelah `since` (epoch ms) + semua pengaturan."""
+    require_db()
+    rows = (
+        await db.items.find({"updatedAt": {"$gt": since}}, {"_id": 0})
+        .sort("updatedAt", 1)
+        .limit(limit)
+        .to_list(limit)
+    )
+    settings = {}
+    async for s in db.settings.find({}, {"_id": 0}):
+        settings[s["key"]] = s.get("value")
+    return {"items": rows, "settings": settings, "serverTime": now_ms(), "more": len(rows) == limit}
+
+
+@api.post("/sync/push")
+async def push(payload: PushIn):
+    """Simpan perubahan lokal. Item dengan updatedAt lebih lama diabaikan (last-write-wins)."""
+    require_db()
+    applied = 0
+    skipped = 0
+    for item in payload.items:
+        doc = item.model_dump()
+        doc["serverAt"] = now_ms()
+        existing = await db.items.find_one({"id": doc["id"]}, {"_id": 0, "updatedAt": 1})
+        if existing and int(existing.get("updatedAt") or 0) > int(doc.get("updatedAt") or 0):
+            skipped += 1
+            continue
+        await db.items.update_one({"id": doc["id"]}, {"$set": doc}, upsert=True)
+        applied += 1
+    for key, value in (payload.settings or {}).items():
+        await db.settings.update_one({"key": key}, {"$set": {"key": key, "value": value}}, upsert=True)
+    return {"applied": applied, "skipped": skipped, "serverTime": now_ms()}
+
+
+@api.get("/sync/stats")
+async def stats():
+    require_db()
+    total = await db.items.count_documents({"deleted": {"$ne": True}})
+    deleted = await db.items.count_documents({"deleted": True})
+    return {"items": total, "deleted": deleted, "serverTime": now_ms()}
+
+
+app.include_router(api)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-@app.on_event("startup")
-async def start_index_build():
-    app.state.index_task = asyncio.create_task(ensure_indexes())  # background: a big index build must not block boot
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    app.state.index_task.cancel()  # stop a build still running before its client closes
-    with suppress(asyncio.CancelledError):
-        await app.state.index_task
-    client.close()
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

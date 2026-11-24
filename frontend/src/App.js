@@ -13,6 +13,7 @@ import { BottomNav } from "./components/BottomNav";
 import { seedIfNeeded } from "./lib/seed";
 import { prepareAll } from "./lib/aiStatus";
 import { runIndexer } from "./lib/indexer";
+import { syncNow, syncEnabled } from "./lib/sync";
 
 function Shell() {
   const loc = useLocation();
@@ -54,6 +55,21 @@ export default function App() {
       };
       if ("requestIdleCallback" in window) window.requestIdleCallback(start, { timeout: 2500 });
       else setTimeout(start, 1200);
+
+      // Sinkron antar perangkat: tarik perubahan saat aplikasi dibuka,
+      // lalu ulangi berkala dan setiap kali koneksi kembali.
+      if (syncEnabled()) {
+        const run = () => { if (!cancelled) syncNow(); };
+        setTimeout(run, 1500);
+        const timer = setInterval(run, 30000);
+        window.addEventListener("online", run);
+        window.addEventListener("focus", run);
+        return () => {
+          clearInterval(timer);
+          window.removeEventListener("online", run);
+          window.removeEventListener("focus", run);
+        };
+      }
     })();
     return () => {
       cancelled = true;

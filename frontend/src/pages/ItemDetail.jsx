@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
 import { Pencil, Trash2, Minus, Plus, Tag, Bike, History, AlertTriangle, Clock, Loader2, Sparkles, Ruler, Printer } from "lucide-react";
-import { db, deleteItem, adjustStock, isLowStock } from "../lib/db";
+import { db, deleteItem, adjustStock, isLowStock, getLiveItem } from "../lib/db";
 import { rupiah, calcProfit, percent, dateTime, timeAgo } from "../lib/format";
 import { useBlobUrl, useSettings } from "../lib/hooks";
 import { PageHeader } from "../components/PageHeader";
@@ -19,7 +19,7 @@ export default function ItemDetail() {
   const settings = useSettings();
   const [shown, setShown] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
-  const item = useLiveQuery(() => db.items.get(itemId), [itemId], "loading");
+  const item = useLiveQuery(() => getLiveItem(itemId), [itemId], "loading");
   const history = useLiveQuery(() => db.priceHistory.where("itemId").equals(itemId).reverse().sortBy("at"), [itemId], []);
   const checks = useLiveQuery(() => db.scanHistory.where("itemId").equals(itemId).count(), [itemId], 0);
   const url = useBlobUrl(item && item !== "loading" ? item.photo : null);

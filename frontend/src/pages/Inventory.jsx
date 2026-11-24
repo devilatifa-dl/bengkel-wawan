@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Search, Plus, X, PackageOpen, ArrowDownUp, Printer } from "lucide-react";
-import { db, isLowStock, searchItems } from "../lib/db";
+import { db, isLowStock, searchItems, liveItems } from "../lib/db";
 import { useSettings } from "../lib/hooks";
 import { ItemCard } from "../components/ItemCard";
 import { PageHeader } from "../components/PageHeader";
@@ -21,7 +21,7 @@ export default function Inventory() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("terbaru");
   const filter = params.get("filter") || "semua";
-  const items = useLiveQuery(() => db.items.toArray(), [], null);
+  const items = useLiveQuery(() => liveItems().toArray(), [], null);
 
   const list = useMemo(() => {
     if (!items) return [];

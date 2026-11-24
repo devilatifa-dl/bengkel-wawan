@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ScanLine, Package, TrendingUp, AlertTriangle, Wallet, ChevronRight, WifiOff, Wifi, Sparkles, Loader2, Clock, Download, Info, Plus, Search } from "lucide-react";
-import { db, isLowStock } from "../lib/db";
+import { db, isLowStock, liveItems, getLiveItem } from "../lib/db";
 import { rupiah, timeAgo, calcProfit } from "../lib/format";
 import { useSettings, useOnline } from "../lib/hooks";
 import { subscribeAI } from "../lib/aiStatus";
@@ -44,7 +44,7 @@ export default function Dashboard() {
   useEffect(() => subscribeAI(setAi), []);
   useEffect(() => onInstallAvailable(setInstallable), []);
 
-  const items = useLiveQuery(() => db.items.toArray(), [], null);
+  const items = useLiveQuery(() => liveItems().toArray(), [], null);
   const recent = useLiveQuery(async () => {
     const rows = await db.scanHistory.orderBy("at").reverse().limit(30).toArray();
     const seen = new Set();
@@ -52,7 +52,7 @@ export default function Dashboard() {
     for (const r of rows) {
       if (seen.has(r.itemId)) continue;
       seen.add(r.itemId);
-      const it = await db.items.get(r.itemId);
+      const it = await getLiveItem(r.itemId);
       if (it) out.push({ ...r, item: it });
       if (out.length >= 8) break;
     }

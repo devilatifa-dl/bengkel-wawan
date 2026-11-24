@@ -28,7 +28,7 @@ export async function getSetting(key) {
 }
 
 export async function setSetting(key, value) {
-  await db.settings.put({ key, value });
+  await db.settings.put({ key, value, updatedAt: Date.now() });
 }
 
 export async function getAllSettings() {
@@ -60,6 +60,7 @@ export async function saveItem(data, existingId) {
     ocrSizes: Array.isArray(data.ocrSizes) ? data.ocrSizes : null,
     ocrAt: data.ocrAt || null,
     updatedAt: now,
+    deleted: false,
   };
   if (existingId) {
     const prev = await db.items.get(existingId);
@@ -75,8 +76,10 @@ export async function saveItem(data, existingId) {
 }
 
 export async function deleteItem(id) {
+  // Soft delete: baris tetap ada dengan deleted=true agar penghapusan ikut
+  // tersinkron ke perangkat lain (lihat lib/sync.js).
   await db.transaction("rw", db.items, db.priceHistory, db.scanHistory, async () => {
-    await db.items.delete(id);
+    await db.items.update(id, { deleted: true, updatedAt: Date.now() });
     await db.priceHistory.where("itemId").equals(id).delete();
     await db.scanHistory.where("itemId").equals(id).delete();
   });
@@ -93,6 +96,17 @@ export async function adjustStock(id, delta) {
   if (!it) return;
   const cur = it.stock === null || it.stock === undefined ? 0 : it.stock;
   await db.items.update(id, { stock: Math.max(0, cur + delta), updatedAt: Date.now() });
+}
+
+/** Item aktif (belum dihapus). Dipakai semua halaman agar item hasil soft delete tidak tampil. */
+export function liveItems() {
+  return db.items.filter((it) => !it.deleted);
+}
+
+/** Ambil satu item aktif; null bila sudah dihapus. */
+export async function getLiveItem(id) {
+  const it = await db.items.get(id);
+  return it && !it.deleted ? it : null;
 }
 
 export function isLowStock(item, threshold) {

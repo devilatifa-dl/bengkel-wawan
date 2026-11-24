@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
 import {
-  Store, AlertTriangle, ListPlus, Printer, ChevronRight, Bike, BadgeCheck, Minus, Plus, Download, Upload, Share2, ShieldCheck, Cpu, HardDrive, Smartphone, Trash2, Sparkles, Loader2, CheckCircle2, XCircle, PackageX, Info,
+  Store, AlertTriangle, ListPlus, Printer, ChevronRight, Bike, BadgeCheck, Minus, Plus, Download, Upload, Share2, ShieldCheck, Cpu, HardDrive, RefreshCw, Smartphone, Trash2, Sparkles, Loader2, CheckCircle2, XCircle, PackageX, Info,
 } from "lucide-react";
-import { db, setSetting, DEFAULT_BRANDS, DEFAULT_MOTORS } from "../lib/db";
+import { db, setSetting, DEFAULT_BRANDS, DEFAULT_MOTORS, liveItems } from "../lib/db";
+import { syncEnabled, syncNow, syncStatus } from "../lib/sync";
 import { OptionsEditor } from "../components/OptionsEditor";
 import { useNavigate } from "react-router-dom";
 import { useSettings } from "../lib/hooks";
@@ -54,6 +55,9 @@ export default function Settings() {
   const navigate = useNavigate();
   const [shopName, setShopName] = useState("");
   const [busy, setBusy] = useState("");
+  const [sync, setSync] = useState(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
   const [pending, setPending] = useState(null); // parsed backup awaiting confirm
   const [confirmWipe, setConfirmWipe] = useState(false);
   const [confirmSamples, setConfirmSamples] = useState(false);
@@ -63,7 +67,7 @@ export default function Settings() {
   const [installable, setInstallable] = useState(canPromptInstall());
   const fileRef = useRef(null);
   const counts = useLiveQuery(async () => {
-    const all = await db.items.toArray();
+    const all = await liveItems().toArray();
     return {
       items: all.length,
       samples: all.filter((i) => i.isSample).length,
@@ -71,6 +75,16 @@ export default function Settings() {
       indexed: all.filter((i) => i.photo && i.embedding).length,
     };
   }, [], { items: 0, samples: 0, withPhoto: 0, indexed: 0 });
+
+  const refreshSync = async () => { if (syncEnabled()) setSync(await syncStatus()); };
+  const doSync = async () => {
+    setSyncBusy(true); setSyncMsg("");
+    const r = await syncNow();
+    setSyncMsg(r.ok ? `Berhasil: ${r.pulled} ditarik, ${r.pushed} dikirim` : `Gagal: ${r.reason}`);
+    await refreshSync();
+    setSyncBusy(false);
+  };
+  useEffect(() => { refreshSync(); }, []);
 
   useEffect(() => setShopName(settings.shopName || ""), [settings.shopName]);
   useEffect(() => subscribeAI(setAi), []);
@@ -228,6 +242,31 @@ export default function Settings() {
           <p className="mt-3 flex items-start gap-2 text-xs text-slate-500">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> File backup tidak dienkripsi dan berisi harga modal. Simpan di tempat aman.
           </p>
+        </Section>
+
+        <Section icon={RefreshCw} title="Sinkron Antar Perangkat" testid="settings-sync-section">
+          {!syncEnabled() ? (
+            <p className="text-sm text-slate-400">
+              Belum aktif. Isi <code className="rounded bg-slate-800 px-1">REACT_APP_BACKEND_URL</code> saat build agar data
+              tersinkron antara HP dan laptop.
+            </p>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-slate-400">
+                Data tetap tersimpan di perangkat ini (bisa dipakai offline), lalu dikirim ke server agar HP dan laptop
+                melihat isi yang sama.
+              </p>
+              <div className="divide-y divide-slate-700/60">
+                <StatusRow testid="settings-sync-online" ok={sync?.online} loading={syncBusy} label="Koneksi server" detail={sync?.online ? "Terhubung" : sync?.error || "Tidak terhubung"} />
+                <StatusRow testid="settings-sync-items" ok={sync?.online} label="Data di server" detail={sync?.online ? `${sync.items ?? 0} barang` : "?"} />
+                <StatusRow testid="settings-sync-last" ok={!!sync?.lastPull} label="Sinkron terakhir" detail={sync?.lastPull ? new Date(sync.lastPull).toLocaleString("id-ID") : "Belum pernah"} />
+              </div>
+              <button type="button" data-testid="settings-sync-now-button" onClick={doSync} disabled={syncBusy} className={`${btn} mt-3 bg-cyan-500 text-slate-950 hover:bg-cyan-400`}>
+                {syncBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />} Sinkronkan Sekarang
+              </button>
+              {syncMsg && <p className="mt-2 text-xs text-slate-400" data-testid="settings-sync-message">{syncMsg}</p>}
+            </>
+          )}
         </Section>
 
         <Section icon={Cpu} title="Status Offline & Kamera AI" testid="settings-offline-section">

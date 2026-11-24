@@ -1,0 +1,11 @@
+frontend/node_modules
+frontend/build
+frontend/.cache
+backend/__pycache__
+backend/.venv
+backend/.env
+tests
+test_reports
+memory
+*.zip
+*.log

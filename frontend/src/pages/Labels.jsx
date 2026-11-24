@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
 import { Printer, FileDown, Share2, Search, X, Check, Minus, Plus, Loader2, Tags } from "lucide-react";
-import { db, searchItems } from "../lib/db";
+import { db, searchItems, liveItems } from "../lib/db";
 import { rupiah } from "../lib/format";
 import { useSettings } from "../lib/hooks";
 import { LABEL_SIZES, gridFor, expandLabels, buildLabelsPdf, labelsFileName, labelMetaLine, PAGE } from "../lib/labels";
@@ -53,7 +53,7 @@ export const LabelSticker = ({ item, size, shopName, showShop, showCompat, testi
 export default function Labels() {
   const [params] = useSearchParams();
   const settings = useSettings();
-  const items = useLiveQuery(() => db.items.toArray(), [], null);
+  const items = useLiveQuery(() => liveItems().toArray(), [], null);
   const [selected, setSelected] = useState({}); // id -> copies
   const [q, setQ] = useState("");
   const [sizeKey, setSizeKey] = useState("sedang");
