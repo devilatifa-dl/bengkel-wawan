@@ -6,6 +6,7 @@ import { blobToBase64, base64ToBlob } from "./image";
 
 const API = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
 const LAST_PULL_KEY = "syncLastPull";
+const LAST_PUSH_KEY = "syncLastPush";
 const DEVICE_KEY = "syncDeviceId";
 
 export const syncEnabled = () => !!API;
@@ -67,10 +68,19 @@ async function setLastPull(ts) {
   await db.settings.put({ key: LAST_PULL_KEY, value: ts });
 }
 
+export async function getLastPush() {
+  const row = await db.settings.get(LAST_PUSH_KEY);
+  return Number(row?.value) || 0;
+}
+
+async function setLastPush(ts) {
+  await db.settings.put({ key: LAST_PUSH_KEY, value: ts });
+}
+
 /** Kirim semua item yang berubah sejak sinkron terakhir + pengaturan. */
 export async function pushChanges() {
   if (!syncEnabled()) return { applied: 0, skipped: 0, offline: true };
-  const since = await getLastPull();
+  const since = await getLastPush();
   const dirty = await db.items.where("updatedAt").above(since).toArray();
   const settings = await getAllSettings();
   const payload = {
@@ -82,11 +92,12 @@ export async function pushChanges() {
       motorOptions: settings.motorOptions,
     },
   };
-  if (!payload.items.length) {
-    // tetap kirim pengaturan agar perubahan nama toko ikut tersinkron
-    return api("/api/sync/push", { method: "POST", body: JSON.stringify({ items: [], settings: payload.settings }) });
-  }
-  return api("/api/sync/push", { method: "POST", body: JSON.stringify(payload) });
+  const res = await api("/api/sync/push", { method: "POST", body: JSON.stringify(payload) });
+  // Cursor push hanya maju bila server menerima; item yang ditolak (data lebih lama)
+  // tetap dihitung agar tidak dikirim berulang.
+  const newest = dirty.reduce((m, it) => Math.max(m, Number(it.updatedAt || 0)), since);
+  await setLastPush(newest);
+  return res;
 }
 
 /** Tarik perubahan dari perangkat lain lalu simpan ke IndexedDB. */

@@ -60,7 +60,7 @@ api = APIRouter(prefix="/api")
 
 
 class ItemIn(BaseModel):
-    id: str
+    id: Any  # Dexie memakai angka; disimpan sebagai string
     name: str = ""
     partCode: str = ""
     brand: str = ""
@@ -131,6 +131,7 @@ async def push(payload: PushIn):
     skipped = 0
     for item in payload.items:
         doc = item.model_dump()
+        doc["id"] = str(doc.get("id"))
         doc["serverAt"] = now_ms()
         existing = await db.items.find_one({"id": doc["id"]}, {"_id": 0, "updatedAt": 1})
         if existing and int(existing.get("updatedAt") or 0) > int(doc.get("updatedAt") or 0):
