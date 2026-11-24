@@ -339,7 +339,7 @@ export default function Settings() {
           </button>
         </Section>
 
-        <p className="pb-2 text-center text-xs text-slate-600">Bengkel & Toko Sparepart Motor • v1.0 • {counts.items} barang • data hanya di HP ini</p>
+        <p className="pb-2 text-center text-xs text-slate-600">Bengkel & Toko Sparepart Motor • v1.1 • {counts.items} barang • data hanya di HP ini</p>
       </div>
 
       {/* Restore confirm */}
