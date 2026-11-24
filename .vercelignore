@@ -1,11 +1,10 @@
-frontend/node_modules
-frontend/build
-frontend/.cache
-backend/__pycache__
-backend/.venv
-backend/.env
+frontend
 tests
 test_reports
 memory
+scripts
+backend/__pycache__
+backend/.venv
+backend/.env
 *.zip
 *.log
