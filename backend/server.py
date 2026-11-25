@@ -137,17 +137,18 @@ def norm_name(value: Any) -> str:
 
 
 def twin_key(doc: Dict[str, Any]) -> str:
-    """Kunci identitas barang.
+    """Kunci identitas barang: kode part + nama + merek.
 
-    Butuh kode part DAN nama sama supaya tidak salah menggabungkan barang
-    berbeda yang kebetulan memakai kode sama (mis. "Ban Dalam 17/250" dan
-    "Ban Luar Trial 17/250" adalah dua barang berbeda).
+    Ketiganya dibutuhkan supaya tidak salah menggabungkan barang berbeda:
+    - "Ban Dalam 17/250" vs "Ban Luar Trial 17/250" (nama beda)
+    - "Membran/Kran Bensin 2006" merek Kinto vs Macho (merek beda)
     """
     name = norm_name(doc.get("name"))
     if not name:
         return ""
     code = norm_code(doc.get("partCode"))
-    return f"{code}|{name}" if code else f"|{name}"
+    brand = norm_name(doc.get("brand"))
+    return f"{code}|{name}|{brand}"
 
 
 async def find_twin(doc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -157,7 +158,7 @@ async def find_twin(doc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     async for row in db.items.find(
         {"deleted": {"$ne": True}, "id": {"$ne": doc["id"]}},
-        {"_id": 0, "id": 1, "updatedAt": 1, "partCode": 1, "name": 1},
+        {"_id": 0, "id": 1, "updatedAt": 1, "partCode": 1, "name": 1, "brand": 1},
     ):
         if twin_key(row) == key:
             return row
@@ -261,16 +262,16 @@ async def stats():
 async def dedupe():
     """Hapus barang ganda yang sudah terlanjur masuk.
 
-    Barang dianggap sama hanya bila **kode part dan nama** sama. Yang
+    Barang dianggap sama hanya bila **kode part, nama, dan merek** sama. Yang
     dipertahankan adalah baris dengan `updatedAt` terbaru.
     """
     require_db()
     groups: Dict[str, List[Dict[str, Any]]] = {}
     async for row in db.items.find(
-        {"deleted": {"$ne": True}}, {"_id": 0, "id": 1, "name": 1, "partCode": 1, "updatedAt": 1}
+        {"deleted": {"$ne": True}}, {"_id": 0, "id": 1, "name": 1, "partCode": 1, "brand": 1, "updatedAt": 1}
     ):
         key = twin_key(row)
-        if not key or key == "|":
+        if not key:
             continue
         groups.setdefault(key, []).append(row)
 

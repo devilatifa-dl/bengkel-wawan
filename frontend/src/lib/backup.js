@@ -77,12 +77,13 @@ export function parseBackup(text) {
   return data;
 }
 
-/** Kunci identitas barang: kode part + nama (lihat lib/db.js itemKey). */
+/** Kunci identitas barang: kode part + nama + merek (lihat lib/db.js itemKey). */
 export function itemKey(it) {
   const name = (it?.name || "").toString().trim().toUpperCase().replace(/\s+/g, " ");
   if (!name) return "";
   const code = (it?.partCode || "").toString().trim().toUpperCase().replace(/\s+/g, "");
-  return `${code}|${name}`;
+  const brand = (it?.brand || "").toString().trim().toUpperCase().replace(/\s+/g, " ");
+  return `${code}|${name}|${brand}`;
 }
 
 /** mode: 'replace' | 'merge' */

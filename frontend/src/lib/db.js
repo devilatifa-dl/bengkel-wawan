@@ -43,17 +43,18 @@ function clean(v) {
 }
 
 /**
- * Kunci identitas barang: kode part + nama.
+ * Kunci identitas barang: kode part + nama + merek.
  *
- * Butuh keduanya supaya tidak salah menggabungkan barang berbeda yang
- * kebetulan memakai kode sama (mis. "Ban Dalam 17/250" dan
- * "Ban Luar Trial 17/250" adalah dua barang berbeda).
+ * Ketiganya dibutuhkan supaya tidak salah menggabungkan barang berbeda:
+ * - "Ban Dalam 17/250" vs "Ban Luar Trial 17/250" (nama beda)
+ * - "Membran/Kran Bensin 2006" merek Kinto vs Macho (merek beda)
  */
 export function itemKey(it) {
   const name = clean(it?.name).toUpperCase().replace(/\s+/g, " ");
   if (!name) return "";
   const code = clean(it?.partCode).toUpperCase().replace(/\s+/g, "");
-  return `${code}|${name}`;
+  const brand = clean(it?.brand).toUpperCase().replace(/\s+/g, " ");
+  return `${code}|${name}|${brand}`;
 }
 
 /**
