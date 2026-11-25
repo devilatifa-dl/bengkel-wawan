@@ -71,3 +71,21 @@ mengirimnya ke server sehingga daftar menumpuk duplikat.
   `more: true`.
 - Konflik antar perangkat diselesaikan dengan last-write-wins, bukan merge per
   field. Hindari mengedit barang yang sama di dua perangkat bersamaan.
+
+## Mencegah barang ganda
+
+Identitas barang ditentukan oleh **kode part + nama + merek**. Ketiganya
+dibutuhkan supaya barang berbeda tidak salah digabung:
+
+| Contoh | Kode | Nama | Merek | Hasil |
+|---|---|---|---|---|
+| Busi NGK CPR7EA-9 (dua kali) | sama | sama | sama | **digabung** |
+| Ban Dalam vs Ban Luar Trial | sama | beda | sama | dua barang |
+| Membran/Kran Bensin | sama | sama | Kinto vs Macho | dua barang |
+
+Pengaman berlapis:
+
+1. **Form tambah barang** — menolak simpan dan mengarahkan ke barang yang sudah ada.
+2. **Restore backup mode merge** — memperbarui barang yang sudah ada, bukan menambah baris.
+3. **Server `/api/sync/push`** — pengaman terakhir; push duplikat diarahkan ke baris yang ada.
+4. **Tombol Bersihkan Barang Ganda** di Pengaturan — untuk data yang terlanjur ganda.
