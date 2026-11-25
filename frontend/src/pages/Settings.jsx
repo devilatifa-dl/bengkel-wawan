@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   Store, AlertTriangle, ListPlus, Printer, ChevronRight, Bike, BadgeCheck, Minus, Plus, Download, Upload, Share2, ShieldCheck, Cpu, HardDrive, RefreshCw, Smartphone, Trash2, Sparkles, Loader2, CheckCircle2, XCircle, PackageX, Info,
 } from "lucide-react";
-import { db, setSetting, DEFAULT_BRANDS, DEFAULT_MOTORS, liveItems } from "../lib/db";
+import { db, setSetting, DEFAULT_BRANDS, DEFAULT_MOTORS, liveItems, itemKey } from "../lib/db";
 import { syncEnabled, syncNow, syncStatus } from "../lib/sync";
 import { OptionsEditor } from "../components/OptionsEditor";
 import { useNavigate } from "react-router-dom";
@@ -84,6 +84,40 @@ export default function Settings() {
     await refreshSync();
     setSyncBusy(false);
   };
+
+  /** Hapus barang ganda lokal: sisakan yang paling baru diubah. */
+  const doDedupe = async () => {
+    setBusy("dedupe");
+    try {
+      const rows = await liveItems().toArray();
+      const groups = new Map();
+      for (const it of rows) {
+        const k = itemKey(it);
+        if (!k) continue;
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(it);
+      }
+      let removed = 0;
+      for (const list of groups.values()) {
+        if (list.length < 2) continue;
+        list.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+        for (const dup of list.slice(1)) {
+          await db.items.update(dup.id, { deleted: true, updatedAt: Date.now() });
+          removed += 1;
+        }
+      }
+      if (removed) {
+        await syncNow().catch(() => {});
+        toast.success(`${removed} barang ganda dihapus`);
+      } else {
+        toast.success("Tidak ada barang ganda");
+      }
+    } catch (e) {
+      toast.error("Gagal membersihkan: " + (e?.message || ""));
+    } finally {
+      setBusy("");
+    }
+  };
   useEffect(() => { refreshSync(); }, []);
 
   useEffect(() => setShopName(settings.shopName || ""), [settings.shopName]);
@@ -153,10 +187,18 @@ export default function Settings() {
     if (!pending) return;
     setBusy("import");
     try {
-      const n = await restoreBackup(pending.data, mode);
-      toast.success(mode === "replace" ? `Data dipulihkan: ${n} barang` : `${n} barang ditambahkan`);
+      const r = await restoreBackup(pending.data, mode);
+      if (mode === "replace") {
+        toast.success(`Data dipulihkan: ${r.total} barang`);
+      } else {
+        const parts = [`${r.added} baru`];
+        if (r.updated) parts.push(`${r.updated} diperbarui`);
+        if (r.skipped) parts.push(`${r.skipped} sudah ada`);
+        toast.success(`Restore selesai: ${parts.join(", ")}`);
+      }
       setPending(null);
       setTimeout(() => runIndexer(), 300);
+      syncNow().catch(() => {});
     } catch (e) {
       toast.error("Gagal memulihkan: " + (e?.message || ""));
     } finally {
@@ -256,6 +298,9 @@ export default function Settings() {
           </div>
           <button type="button" data-testid="settings-sync-now-button" onClick={doSync} disabled={syncBusy} className={`${btn} mt-3 bg-cyan-500 text-slate-950 hover:bg-cyan-400`}>
             {syncBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />} Sinkronkan Sekarang
+          </button>
+          <button type="button" data-testid="settings-dedupe-button" onClick={doDedupe} disabled={busy === "dedupe"} className={`${btn} mt-2 border border-slate-600 text-slate-100`}>
+            {busy === "dedupe" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5" />} Bersihkan Barang Ganda
           </button>
           {syncMsg && <p className="mt-2 text-xs text-slate-400" data-testid="settings-sync-message">{syncMsg}</p>}
         </Section>

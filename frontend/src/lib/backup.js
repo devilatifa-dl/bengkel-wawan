@@ -77,6 +77,14 @@ export function parseBackup(text) {
   return data;
 }
 
+/** Kunci identitas barang: kode part + nama (lihat lib/db.js itemKey). */
+export function itemKey(it) {
+  const name = (it?.name || "").toString().trim().toUpperCase().replace(/\s+/g, " ");
+  if (!name) return "";
+  const code = (it?.partCode || "").toString().trim().toUpperCase().replace(/\s+/g, "");
+  return `${code}|${name}`;
+}
+
 /** mode: 'replace' | 'merge' */
 export async function restoreBackup(data, mode = "replace") {
   const items = [];
@@ -92,16 +100,44 @@ export async function restoreBackup(data, mode = "replace") {
     items.push({ ...it, photo, embedding: null });
   }
   const idMap = {};
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
   await db.transaction("rw", db.items, db.priceHistory, db.scanHistory, db.settings, async () => {
     if (mode === "replace") {
       await db.items.clear();
       await db.priceHistory.clear();
       await db.scanHistory.clear();
     }
+    // Peta barang yang sudah ada supaya restore tidak membuat duplikat.
+    const existing = new Map();
+    if (mode === "merge") {
+      for (const row of await db.items.toArray()) {
+        const k = itemKey(row);
+        if (k && !existing.has(k)) existing.set(k, row);
+      }
+    }
     for (const it of items) {
       const { id: oldId, ...rest } = it;
+      const key = itemKey(rest);
+      const hit = key ? existing.get(key) : null;
+      if (hit) {
+        // Sudah ada: perbarui hanya bila data backup lebih baru.
+        const incomingAt = Number(rest.updatedAt || 0);
+        const localAt = Number(hit.updatedAt || 0);
+        if (incomingAt > localAt) {
+          await db.items.update(hit.id, { ...rest, isSample: rest.isSample ? 1 : 0, updatedAt: incomingAt });
+          updated += 1;
+        } else {
+          skipped += 1;
+        }
+        idMap[oldId] = hit.id;
+        continue;
+      }
       const newId = await db.items.add({ ...rest, isSample: rest.isSample ? 1 : 0 });
+      if (key) existing.set(key, { ...rest, id: newId });
       idMap[oldId] = newId;
+      added += 1;
     }
     for (const ph of data.priceHistory || []) {
       const { id, itemId, ...rest } = ph;
@@ -140,7 +176,7 @@ export async function restoreBackup(data, mode = "replace") {
     }
     await db.settings.put({ key: "seeded", value: true });
   });
-  return items.length;
+  return { total: items.length, added, updated, skipped };
 }
 
 export async function wipeAll() {

@@ -128,6 +128,42 @@ def require_db():
         raise HTTPException(503, "Database belum dikonfigurasi (MONGO_URL kosong)")
 
 
+def norm_code(value: Any) -> str:
+    return "".join(str(value or "").upper().split())
+
+
+def norm_name(value: Any) -> str:
+    return " ".join(str(value or "").upper().split())
+
+
+def twin_key(doc: Dict[str, Any]) -> str:
+    """Kunci identitas barang.
+
+    Butuh kode part DAN nama sama supaya tidak salah menggabungkan barang
+    berbeda yang kebetulan memakai kode sama (mis. "Ban Dalam 17/250" dan
+    "Ban Luar Trial 17/250" adalah dua barang berbeda).
+    """
+    name = norm_name(doc.get("name"))
+    if not name:
+        return ""
+    code = norm_code(doc.get("partCode"))
+    return f"{code}|{name}" if code else f"|{name}"
+
+
+async def find_twin(doc: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Cari barang aktif lain yang benar-benar sama (kode part + nama)."""
+    key = twin_key(doc)
+    if not key:
+        return None
+    async for row in db.items.find(
+        {"deleted": {"$ne": True}, "id": {"$ne": doc["id"]}},
+        {"_id": 0, "id": 1, "updatedAt": 1, "partCode": 1, "name": 1},
+    ):
+        if twin_key(row) == key:
+            return row
+    return None
+
+
 @api.get("/")
 async def root():
     return {"message": "API sinkronisasi Bengkel & Toko Sparepart Motor"}
@@ -177,6 +213,7 @@ async def push(payload: PushIn):
     require_db()
     applied = 0
     skipped = 0
+    merged = 0
     for item in payload.items:
         doc = item.model_dump()
         doc["id"] = str(doc.get("id"))
@@ -185,6 +222,17 @@ async def push(payload: PushIn):
         if existing and int(existing.get("updatedAt") or 0) > int(doc.get("updatedAt") or 0):
             skipped += 1
             continue
+        # Pengaman terakhir: kalau perangkat lain sudah punya barang dengan kode
+        # part (atau nama) yang sama, jangan buat baris baru. Arahkan ke baris
+        # yang sudah ada supaya daftar tidak menumpuk duplikat.
+        if not existing and not doc.get("deleted"):
+            twin = await find_twin(doc)
+            if twin:
+                doc["id"] = twin["id"]
+                if int(twin.get("updatedAt") or 0) > int(doc.get("updatedAt") or 0):
+                    skipped += 1
+                    continue
+                merged += 1
         # Setiap tulisan yang diterima dapat nomor urut baru supaya perangkat
         # lain pasti melihatnya pada tarikan berikutnya.
         doc["seq"] = await next_seq()
@@ -192,7 +240,7 @@ async def push(payload: PushIn):
         applied += 1
     for key, value in (payload.settings or {}).items():
         await db.settings.update_one({"key": key}, {"$set": {"key": key, "value": value}}, upsert=True)
-    return {"applied": applied, "skipped": skipped, "serverTime": now_ms()}
+    return {"applied": applied, "skipped": skipped, "merged": merged, "serverTime": now_ms()}
 
 
 @api.get("/sync/stats")
@@ -207,6 +255,37 @@ async def stats():
         "cursor": int((counter or {}).get("value") or 0),
         "serverTime": now_ms(),
     }
+
+
+@api.post("/sync/dedupe")
+async def dedupe():
+    """Hapus barang ganda yang sudah terlanjur masuk.
+
+    Barang dianggap sama hanya bila **kode part dan nama** sama. Yang
+    dipertahankan adalah baris dengan `updatedAt` terbaru.
+    """
+    require_db()
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    async for row in db.items.find(
+        {"deleted": {"$ne": True}}, {"_id": 0, "id": 1, "name": 1, "partCode": 1, "updatedAt": 1}
+    ):
+        key = twin_key(row)
+        if not key or key == "|":
+            continue
+        groups.setdefault(key, []).append(row)
+
+    removed = 0
+    for rows in groups.values():
+        if len(rows) < 2:
+            continue
+        rows.sort(key=lambda r: int(r.get("updatedAt") or 0), reverse=True)
+        for dup in rows[1:]:
+            await db.items.update_one(
+                {"id": dup["id"]},
+                {"$set": {"deleted": True, "seq": await next_seq(), "serverAt": now_ms()}},
+            )
+            removed += 1
+    return {"removed": removed, "remaining": await db.items.count_documents({"deleted": {"$ne": True}})}
 
 
 app.include_router(api)

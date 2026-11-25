@@ -42,6 +42,31 @@ function clean(v) {
   return (v || "").toString().trim();
 }
 
+/**
+ * Kunci identitas barang: kode part + nama.
+ *
+ * Butuh keduanya supaya tidak salah menggabungkan barang berbeda yang
+ * kebetulan memakai kode sama (mis. "Ban Dalam 17/250" dan
+ * "Ban Luar Trial 17/250" adalah dua barang berbeda).
+ */
+export function itemKey(it) {
+  const name = clean(it?.name).toUpperCase().replace(/\s+/g, " ");
+  if (!name) return "";
+  const code = clean(it?.partCode).toUpperCase().replace(/\s+/g, "");
+  return `${code}|${name}`;
+}
+
+/**
+ * Cari barang lain yang benar-benar sama (kode part + nama sama).
+ * Dipakai untuk mencegah barang ganda.
+ */
+export async function findDuplicate(data, excludeId) {
+  const key = itemKey(data);
+  if (!key) return null;
+  const rows = await db.items.filter((it) => !it.deleted && it.id !== excludeId).toArray();
+  return rows.find((it) => itemKey(it) === key) || null;
+}
+
 export async function saveItem(data, existingId) {
   const now = Date.now();
   const record = {

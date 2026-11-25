@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Camera, Image as ImageIcon, Minus, Plus, Loader2, TrendingUp, Percent, AlertTriangle, Trash2, Save, Sparkles, Ruler, Settings2 } from "lucide-react";
 import { OptionsEditor } from "../components/OptionsEditor";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
-import { db, saveItem, SIZE_KEYWORDS, DEFAULT_BRANDS, DEFAULT_MOTORS } from "../lib/db";
+import { db, saveItem, findDuplicate, SIZE_KEYWORDS, DEFAULT_BRANDS, DEFAULT_MOTORS } from "../lib/db";
 import { compressImage } from "../lib/image";
 import { computeEmbedding, runOcr } from "../lib/ai";
 import { formatSize } from "../lib/match";
@@ -180,19 +180,25 @@ export default function ItemForm() {
       const fill = {};
       if (o && !f.partCode && o.code) fill.partCode = o.code;
       if (o && !f.size && o.sizes && o.sizes[0]) fill.size = formatSize(o.sizes[0]);
-      const newId = await saveItem(
-        {
-          ...f,
-          ...fill,
-          photo,
-          embedding: emb,
-          stock: trackStock ? stock : null,
-          ocrTokens: photo && o ? o.tokens : null,
-          ocrSizes: photo && o ? o.sizes : null,
-          ocrAt: photo && o ? o.at : null,
-        },
-        editId
-      );
+      const payload = {
+        ...f,
+        ...fill,
+        photo,
+        embedding: emb,
+        stock: trackStock ? stock : null,
+        ocrTokens: photo && o ? o.tokens : null,
+        ocrSizes: photo && o ? o.sizes : null,
+        ocrAt: photo && o ? o.at : null,
+      };
+      // Cegah barang ganda: kode part sama, atau nama sama bila kode part kosong.
+      const dup = await findDuplicate(payload, editId);
+      if (dup) {
+        setSaving(false);
+        toast.error(`Barang sudah ada: "${dup.name}". Buka barang itu untuk mengubah stok/harga.`);
+        navigate(`/barang/${dup.id}`, { replace: true });
+        return;
+      }
+      const newId = await saveItem(payload, editId);
       toast.success(editId ? "Perubahan disimpan" : "Barang baru tersimpan");
       // Kirim segera ke server supaya perangkat lain langsung melihatnya.
       syncNow().catch(() => {});
