@@ -32,7 +32,7 @@ export const BottomNav = () => {
   return (
     <nav
       data-testid="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-40 mx-auto max-w-[480px] border-t border-slate-700/70 bg-[#0B1220]"
+      className="fixed bottom-0 left-0 right-0 z-40 mx-auto w-full border-t border-slate-700/70 bg-[#0B1220] lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="grid grid-cols-5 items-end px-2 pt-1.5 pb-1.5">

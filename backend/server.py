@@ -4,7 +4,15 @@ Aplikasi tetap offline-first: data utama disimpan di IndexedDB HP/laptop.
 Endpoint di sini hanya menyimpan salinan terpusat agar beberapa perangkat
 (HP + laptop) melihat data yang sama.
 
-Model sinkronisasi: last-write-wins berdasarkan `updatedAt` (epoch ms).
+Dua konsep terpisah:
+- `updatedAt` (epoch ms dari perangkat) dipakai untuk last-write-wins.
+- `seq` (nomor urut dari server) dipakai sebagai cursor tarik data.
+
+Memakai `updatedAt` sebagai cursor bermasalah karena jam HP dan laptop bisa
+berbeda: item dari HP yang jamnya lebih lambat akan punya `updatedAt` kecil
+dan terlewat selamanya. `seq` selalu naik di server sehingga tidak mungkin
+ada perubahan yang terlewat.
+
 Item yang dihapus memakai soft delete (`deleted: true`) agar penghapusan
 ikut tersinkron ke perangkat lain.
 """
@@ -35,9 +43,37 @@ if MONGO_URL:
 
 logger = logging.getLogger("bengkel")
 
+SEQ_ID = "items"
+
 
 def now_ms() -> int:
     return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+
+async def next_seq(count: int = 1) -> int:
+    """Ambil blok nomor urut baru. Selalu naik, tidak pernah mundur."""
+    doc = await db.counters.find_one_and_update(
+        {"_id": SEQ_ID},
+        {"$inc": {"value": count}},
+        upsert=True,
+        return_document=True,
+    )
+    return int(doc["value"])
+
+
+async def backfill_seq() -> None:
+    """Beri `seq` pada dokumen lama yang belum punya, urut berdasarkan updatedAt."""
+    missing = await db.items.count_documents({"seq": {"$exists": False}})
+    if not missing:
+        return
+    rows = await db.items.find({"seq": {"$exists": False}}, {"_id": 1}).sort("updatedAt", 1).to_list(5000)
+    if not rows:
+        return
+    start = await next_seq(len(rows))
+    base = start - len(rows)
+    for i, row in enumerate(rows):
+        await db.items.update_one({"_id": row["_id"]}, {"$set": {"seq": base + i + 1}})
+    logger.info("Backfill seq untuk %s item lama", len(rows))
 
 
 @asynccontextmanager
@@ -46,7 +82,9 @@ async def lifespan(app: FastAPI):
         try:
             await db.items.create_index("id", unique=True)
             await db.items.create_index("updatedAt")
+            await db.items.create_index("seq")
             await db.settings.create_index("key", unique=True)
+            await backfill_seq()
             logger.info("Index siap pada database %s", DB_NAME)
         except Exception as exc:  # jangan gagalkan boot karena index
             logger.error("Gagal membuat index: %s", exc)
@@ -109,18 +147,28 @@ async def health():
 
 @api.get("/sync/pull")
 async def pull(since: int = Query(0, ge=0), limit: int = Query(500, ge=1, le=2000)):
-    """Ambil item yang berubah setelah `since` (epoch ms) + semua pengaturan."""
+    """Ambil item dengan `seq` > `since` + semua pengaturan.
+
+    `since` adalah nomor urut server, bukan timestamp, sehingga perubahan dari
+    perangkat yang jamnya berbeda tetap ikut tertarik.
+    """
     require_db()
     rows = (
-        await db.items.find({"updatedAt": {"$gt": since}}, {"_id": 0})
-        .sort("updatedAt", 1)
+        await db.items.find({"seq": {"$gt": since}}, {"_id": 0})
+        .sort("seq", 1)
         .limit(limit)
         .to_list(limit)
     )
     settings = {}
     async for s in db.settings.find({}, {"_id": 0}):
         settings[s["key"]] = s.get("value")
-    return {"items": rows, "settings": settings, "serverTime": now_ms(), "more": len(rows) == limit}
+    return {
+        "items": rows,
+        "settings": settings,
+        "serverTime": now_ms(),
+        "cursor": int(rows[-1]["seq"]) if rows else since,
+        "more": len(rows) == limit,
+    }
 
 
 @api.post("/sync/push")
@@ -137,6 +185,9 @@ async def push(payload: PushIn):
         if existing and int(existing.get("updatedAt") or 0) > int(doc.get("updatedAt") or 0):
             skipped += 1
             continue
+        # Setiap tulisan yang diterima dapat nomor urut baru supaya perangkat
+        # lain pasti melihatnya pada tarikan berikutnya.
+        doc["seq"] = await next_seq()
         await db.items.update_one({"id": doc["id"]}, {"$set": doc}, upsert=True)
         applied += 1
     for key, value in (payload.settings or {}).items():
@@ -149,7 +200,13 @@ async def stats():
     require_db()
     total = await db.items.count_documents({"deleted": {"$ne": True}})
     deleted = await db.items.count_documents({"deleted": True})
-    return {"items": total, "deleted": deleted, "serverTime": now_ms()}
+    counter = await db.counters.find_one({"_id": SEQ_ID})
+    return {
+        "items": total,
+        "deleted": deleted,
+        "cursor": int((counter or {}).get("value") or 0),
+        "serverTime": now_ms(),
+    }
 
 
 app.include_router(api)

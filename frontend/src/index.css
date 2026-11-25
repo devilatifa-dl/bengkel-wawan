@@ -65,6 +65,12 @@
 .safe-bottom {
     padding-bottom: calc(112px + env(safe-area-inset-bottom));
 }
+/* Di layar lebar bottom-nav disembunyikan, jadi ruang bawah tidak perlu ekstra. */
+@media (min-width: 1024px) {
+    .safe-bottom {
+        padding-bottom: 40px;
+    }
+}
 
 /* subtle noise / grid texture for header areas */
 .tech-grid {

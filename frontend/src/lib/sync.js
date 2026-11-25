@@ -4,12 +4,15 @@
 import { db, getAllSettings } from "./db";
 import { blobToBase64, base64ToBlob } from "./image";
 
+// Kosong = pakai origin yang sama (frontend & backend satu domain di Vercel).
+// Ini menghindari CORS dan tidak butuh variabel build.
 const API = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
 const LAST_PULL_KEY = "syncLastPull";
+const LAST_PULL_AT_KEY = "syncLastPullAt";
 const LAST_PUSH_KEY = "syncLastPush";
 const DEVICE_KEY = "syncDeviceId";
 
-export const syncEnabled = () => !!API;
+export const syncEnabled = () => true;
 
 export function deviceId() {
   let id = localStorage.getItem(DEVICE_KEY);
@@ -21,7 +24,6 @@ export function deviceId() {
 }
 
 async function api(path, options = {}) {
-  if (!API) throw new Error("URL backend belum diatur (REACT_APP_BACKEND_URL)");
   const res = await fetch(`${API}${path}`, {
     ...options,
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -61,11 +63,29 @@ async function fromWire(row) {
 
 export async function getLastPull() {
   const row = await db.settings.get(LAST_PULL_KEY);
-  return Number(row?.value) || 0;
+  const value = Number(row?.value) || 0;
+  // Versi lama memakai timestamp (epoch ms) sebagai cursor. Cursor sekarang
+  // berupa nomor urut server yang jauh lebih kecil, jadi nilai lama harus
+  // direset agar tarikan berikutnya tidak melewatkan semua data.
+  if (value > 1e12) {
+    await setLastPull(0);
+    return 0;
+  }
+  return value;
 }
 
 async function setLastPull(ts) {
   await db.settings.put({ key: LAST_PULL_KEY, value: ts });
+}
+
+/** Waktu (epoch ms) tarikan terakhir yang berhasil — untuk ditampilkan di Pengaturan. */
+export async function getLastPullAt() {
+  const row = await db.settings.get(LAST_PULL_AT_KEY);
+  return Number(row?.value) || 0;
+}
+
+async function setLastPullAt(ts) {
+  await db.settings.put({ key: LAST_PULL_AT_KEY, value: ts });
 }
 
 export async function getLastPush() {
@@ -93,8 +113,9 @@ export async function pushChanges() {
     },
   };
   const res = await api("/api/sync/push", { method: "POST", body: JSON.stringify(payload) });
-  // Cursor push hanya maju bila server menerima; item yang ditolak (data lebih lama)
-  // tetap dihitung agar tidak dikirim berulang.
+  // Cursor push hanya maju setelah server menerima. Kalau pengiriman gagal,
+  // cursor tidak berubah sehingga item yang sama dicoba lagi pada sinkron
+  // berikutnya (mis. HP sempat offline saat menambah barang).
   const newest = dirty.reduce((m, it) => Math.max(m, Number(it.updatedAt || 0)), since);
   await setLastPush(newest);
   return res;
@@ -122,7 +143,6 @@ export async function pullChanges() {
         await db.items.put(item);
       }
       total += 1;
-      cursor = Math.max(cursor, Number(row.updatedAt || 0));
     }
     if (res.settings) {
       for (const [key, value] of Object.entries(res.settings)) {
@@ -131,14 +151,15 @@ export async function pullChanges() {
         }
       }
     }
-    if (!res.more) {
-      cursor = Math.max(cursor, Number(res.serverTime || 0));
-      break;
-    }
+    // Cursor memakai nomor urut server (`seq`), bukan timestamp perangkat.
+    // Timestamp bisa berbeda antar HP/laptop sehingga perubahan bisa terlewat.
+    if (typeof res.cursor === "number") cursor = Math.max(cursor, res.cursor);
+    if (!res.more) break;
     guard += 1;
     if (guard > 40) break;
   }
   await setLastPull(cursor);
+  await setLastPullAt(Date.now());
   return { items: total };
 }
 
@@ -158,8 +179,8 @@ export async function syncStatus() {
   if (!syncEnabled()) return { enabled: false };
   try {
     const res = await api("/api/sync/stats");
-    return { enabled: true, online: true, ...res, lastPull: await getLastPull() };
+    return { enabled: true, online: true, ...res, lastPull: await getLastPullAt() };
   } catch (e) {
-    return { enabled: true, online: false, error: e.message, lastPull: await getLastPull() };
+    return { enabled: true, online: false, error: e.message, lastPull: await getLastPullAt() };
   }
 }

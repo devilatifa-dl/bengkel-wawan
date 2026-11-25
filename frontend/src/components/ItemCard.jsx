@@ -12,10 +12,10 @@ export const ItemCard = ({ item, low, onClick, testid = "inventory-item-card", r
       low ? "border-amber-500/60 shadow-[0_0_0_1px_rgba(245,158,11,0.15),0_8px_24px_rgba(245,158,11,0.08)]" : "border-slate-700/70"
     }`}
   >
-    <ItemThumb blob={item.photo} className="h-[68px] w-[68px]" rounded="rounded-xl" />
+    <ItemThumb blob={item.photo} className="h-[68px] w-[68px] shrink-0" rounded="rounded-xl" />
     <div className="min-w-0 flex-1">
       <div className="line-clamp-2 text-[15px] font-semibold leading-snug text-slate-100">{item.name}</div>
-      <div className="mt-0.5 flex items-center gap-2">
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="truncate font-mono text-xs text-cyan-300/90">{item.partCode || "—"}</span>
         {item.size ? <span data-testid="item-card-size" className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-amber-300">{item.size}</span> : null}
         {item.isSample ? (
@@ -24,17 +24,17 @@ export const ItemCard = ({ item, low, onClick, testid = "inventory-item-card", r
           </span>
         ) : null}
       </div>
-      <div className="mt-0.5 truncate text-xs text-slate-400">
+      <div className="mt-0.5 line-clamp-1 text-xs text-slate-400">
         {[item.brand, item.compatibility].filter(Boolean).join(" • ") || "—"}
       </div>
     </div>
     <div className="flex shrink-0 flex-col items-end gap-1">
       {right || (
         <>
-          <span className="tabular font-display text-base font-bold text-white">{rupiah(item.sellPrice)}</span>
+          <span className="tabular font-display whitespace-nowrap text-base font-bold text-white">{rupiah(item.sellPrice)}</span>
           {item.stock !== null && item.stock !== undefined ? (
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                 low ? "bg-amber-500/15 text-amber-300" : "bg-slate-800 text-slate-300"
               }`}
             >
@@ -46,6 +46,6 @@ export const ItemCard = ({ item, low, onClick, testid = "inventory-item-card", r
         </>
       )}
     </div>
-    <ChevronRight className="h-5 w-5 shrink-0 text-slate-600" />
+    <ChevronRight className="hidden h-5 w-5 shrink-0 text-slate-600 sm:block" />
   </button>
 );

@@ -56,7 +56,7 @@ export default function Inventory() {
           </button>
         }
       />
-      <div className="sticky top-[64px] z-20 space-y-3 border-b border-slate-800 bg-[#0F172A] px-4 pb-3 pt-3">
+      <div className="sticky top-[64px] z-20 space-y-3 border-b border-slate-800 bg-[#0F172A] px-4 pb-3 pt-3 sm:px-6 lg:px-8">
         <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-700 bg-[#0B1220] px-4 focus-within:ring-2 focus-within:ring-cyan-400/70">
           <Search className="h-5 w-5 text-slate-400" />
           <input
@@ -107,7 +107,7 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5 px-4 pt-4" data-testid="inventory-list">
+      <div className="flex flex-col gap-2.5 px-4 pt-4 sm:px-6 lg:grid lg:grid-cols-2 lg:gap-3 lg:px-8" data-testid="inventory-list">
         {!items &&
           [0, 1, 2, 3].map((i) => <div key={i} className="shimmer h-[92px] rounded-2xl" />)}
         {items &&
@@ -130,8 +130,8 @@ export default function Inventory() {
         type="button"
         data-testid="inventory-add-fab"
         onClick={() => navigate("/barang/baru")}
-        className="fixed z-30 inline-flex h-14 items-center gap-2 rounded-full bg-cyan-500 px-5 font-bold text-slate-950 shadow-[0_18px_50px_rgba(0,0,0,0.55)] transition-colors duration-150 hover:bg-cyan-400 active:scale-95"
-        style={{ bottom: "calc(104px + env(safe-area-inset-bottom))", right: "max(16px, calc(50vw - 240px + 16px))" }}
+        className="fixed z-30 inline-flex h-14 items-center gap-2 rounded-full bg-cyan-500 px-5 font-bold text-slate-950 shadow-[0_18px_50px_rgba(0,0,0,0.55)] transition-colors duration-150 hover:bg-cyan-400 active:scale-95 lg:hidden"
+        style={{ bottom: "calc(104px + env(safe-area-inset-bottom))", right: "16px" }}
       >
         <Plus className="h-6 w-6" /> Tambah
       </button>

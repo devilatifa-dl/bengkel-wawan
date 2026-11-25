@@ -169,7 +169,7 @@ export default function Settings() {
   return (
     <div data-testid="settings-page" className="safe-bottom">
       <PageHeader title="Pengaturan" subtitle="Backup, stok, dan status offline" />
-      <div className="space-y-4 px-4 pt-4">
+      <div className="space-y-4 px-4 pt-4 sm:px-6 lg:px-8">
         <Section icon={Store} title="Profil Toko" testid="settings-shop-section">
           <label htmlFor="shop-name" className="mb-2 block text-sm text-slate-400">Nama Toko / Bengkel</label>
           <input
@@ -245,28 +245,19 @@ export default function Settings() {
         </Section>
 
         <Section icon={RefreshCw} title="Sinkron Antar Perangkat" testid="settings-sync-section">
-          {!syncEnabled() ? (
-            <p className="text-sm text-slate-400">
-              Belum aktif. Isi <code className="rounded bg-slate-800 px-1">REACT_APP_BACKEND_URL</code> saat build agar data
-              tersinkron antara HP dan laptop.
-            </p>
-          ) : (
-            <>
-              <p className="mb-3 text-sm text-slate-400">
-                Data tetap tersimpan di perangkat ini (bisa dipakai offline), lalu dikirim ke server agar HP dan laptop
-                melihat isi yang sama.
-              </p>
-              <div className="divide-y divide-slate-700/60">
-                <StatusRow testid="settings-sync-online" ok={sync?.online} loading={syncBusy} label="Koneksi server" detail={sync?.online ? "Terhubung" : sync?.error || "Tidak terhubung"} />
-                <StatusRow testid="settings-sync-items" ok={sync?.online} label="Data di server" detail={sync?.online ? `${sync.items ?? 0} barang` : "?"} />
-                <StatusRow testid="settings-sync-last" ok={!!sync?.lastPull} label="Sinkron terakhir" detail={sync?.lastPull ? new Date(sync.lastPull).toLocaleString("id-ID") : "Belum pernah"} />
-              </div>
-              <button type="button" data-testid="settings-sync-now-button" onClick={doSync} disabled={syncBusy} className={`${btn} mt-3 bg-cyan-500 text-slate-950 hover:bg-cyan-400`}>
-                {syncBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />} Sinkronkan Sekarang
-              </button>
-              {syncMsg && <p className="mt-2 text-xs text-slate-400" data-testid="settings-sync-message">{syncMsg}</p>}
-            </>
-          )}
+          <p className="mb-3 text-sm text-slate-400">
+            Data tetap tersimpan di perangkat ini (bisa dipakai offline), lalu dikirim ke server agar HP dan laptop
+            melihat isi yang sama.
+          </p>
+          <div className="divide-y divide-slate-700/60">
+            <StatusRow testid="settings-sync-online" ok={sync?.online} loading={syncBusy} label="Koneksi server" detail={sync?.online ? "Terhubung" : sync?.error || "Tidak terhubung"} />
+            <StatusRow testid="settings-sync-items" ok={sync?.online} label="Data di server" detail={sync?.online ? `${sync.items ?? 0} barang` : "?"} />
+            <StatusRow testid="settings-sync-last" ok={!!sync?.lastPull} label="Sinkron terakhir" detail={sync?.lastPull ? new Date(sync.lastPull).toLocaleString("id-ID") : "Belum pernah"} />
+          </div>
+          <button type="button" data-testid="settings-sync-now-button" onClick={doSync} disabled={syncBusy} className={`${btn} mt-3 bg-cyan-500 text-slate-950 hover:bg-cyan-400`}>
+            {syncBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />} Sinkronkan Sekarang
+          </button>
+          {syncMsg && <p className="mt-2 text-xs text-slate-400" data-testid="settings-sync-message">{syncMsg}</p>}
         </Section>
 
         <Section icon={Cpu} title="Status Offline & Kamera AI" testid="settings-offline-section">

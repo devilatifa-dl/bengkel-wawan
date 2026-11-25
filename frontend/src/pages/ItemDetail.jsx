@@ -56,7 +56,7 @@ export default function ItemDetail() {
           </button>
         }
       />
-      <div className="space-y-4 px-4 pt-4">
+      <div className="space-y-4 px-4 pt-4 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-2xl border border-slate-700 bg-[#0B1220]">
           {url ? <img src={url} alt={item.name} className="h-64 w-full object-cover" data-testid="item-detail-photo" /> : <div className="flex h-40 items-center justify-center text-slate-600">Tidak ada foto</div>}
           {item.isSample ? <span data-testid="example-item-badge" className="absolute right-3 top-3 rounded-full border border-amber-500/50 bg-slate-900 px-3 py-1 text-xs font-semibold text-amber-400">Contoh</span> : null}

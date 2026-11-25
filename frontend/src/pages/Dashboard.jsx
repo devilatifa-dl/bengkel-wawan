@@ -80,13 +80,13 @@ export default function Dashboard() {
 
   return (
     <div data-testid="dashboard-page" className="safe-bottom">
-      <section className="header-glow relative overflow-hidden px-4 pb-6" style={{ paddingTop: "calc(env(safe-area-inset-top) + 20px)" }}>
+      <section className="header-glow relative overflow-hidden px-4 pb-6 sm:px-6 lg:px-8" style={{ paddingTop: "calc(env(safe-area-inset-top) + 20px)" }}>
         <div className="tech-grid pointer-events-none absolute inset-0 opacity-60" />
         <div className="relative">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">Bengkel & Toko Sparepart</p>
-              <h1 data-testid="dashboard-shop-name" className="font-display mt-1 truncate text-3xl font-bold text-white">{settings.shopName}</h1>
+              <h1 data-testid="dashboard-shop-name" className="font-display mt-1 truncate text-3xl font-bold text-white lg:text-4xl">{settings.shopName}</h1>
             </div>
             <span
               data-testid="dashboard-online-status"
@@ -103,33 +103,35 @@ export default function Dashboard() {
             {aiReady ? "Kamera AI siap — berjalan 100% di HP" : "Menyiapkan kamera AI di perangkat…"}
           </div>
 
-          <button
-            type="button"
-            data-testid="dashboard-scan-cta"
-            onClick={() => navigate("/scan")}
-            className="mt-5 flex w-full items-center gap-4 rounded-2xl bg-amber-500 p-4 text-left text-slate-950 shadow-[0_18px_50px_rgba(245,158,11,0.18)] transition-colors duration-150 hover:bg-amber-400 active:scale-[0.99]"
-          >
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-amber-400">
-              <ScanLine className="h-8 w-8" strokeWidth={2.4} />
-            </div>
-            <div className="flex-1">
-              <div className="font-display text-xl font-bold">Scan Barang</div>
-              <div className="text-sm font-medium text-slate-900/80">Foto barang / label → harga langsung muncul</div>
-            </div>
-            <ChevronRight className="h-6 w-6" />
-          </button>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <button type="button" data-testid="dashboard-search-button" onClick={() => navigate("/cari")} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-slate-700 bg-[#1E293B] font-semibold text-slate-100 active:scale-[0.98]">
-              <Search className="h-5 w-5 text-cyan-400" /> Cari Cepat
+          <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-stretch">
+            <button
+              type="button"
+              data-testid="dashboard-scan-cta"
+              onClick={() => navigate("/scan")}
+              className="flex w-full items-center gap-4 rounded-2xl bg-amber-500 p-4 text-left text-slate-950 shadow-[0_18px_50px_rgba(245,158,11,0.18)] transition-colors duration-150 hover:bg-amber-400 active:scale-[0.99] lg:flex-1"
+            >
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-amber-400">
+                <ScanLine className="h-8 w-8" strokeWidth={2.4} />
+              </div>
+              <div className="flex-1">
+                <div className="font-display text-xl font-bold">Scan Barang</div>
+                <div className="text-sm font-medium text-slate-900/80">Foto barang / label → harga langsung muncul</div>
+              </div>
+              <ChevronRight className="h-6 w-6" />
             </button>
-            <button type="button" data-testid="dashboard-add-button" onClick={() => navigate("/barang/baru")} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-slate-700 bg-[#1E293B] font-semibold text-slate-100 active:scale-[0.98]">
-              <Plus className="h-5 w-5 text-cyan-400" /> Tambah Barang
-            </button>
+            <div className="grid grid-cols-2 gap-3 lg:w-[320px] lg:shrink-0">
+              <button type="button" data-testid="dashboard-search-button" onClick={() => navigate("/cari")} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-slate-700 bg-[#1E293B] font-semibold text-slate-100 active:scale-[0.98]">
+                <Search className="h-5 w-5 text-cyan-400" /> Cari Cepat
+              </button>
+              <button type="button" data-testid="dashboard-add-button" onClick={() => navigate("/barang/baru")} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-slate-700 bg-[#1E293B] font-semibold text-slate-100 active:scale-[0.98]">
+                <Plus className="h-5 w-5 text-cyan-400" /> Tambah Barang
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="space-y-5 px-4 pt-5">
+      <div className="space-y-5 px-4 pt-5 sm:px-6 lg:px-8 lg:pt-6">
         {showInstall && (
           <div data-testid="dashboard-install-banner" className="flex items-center gap-3 rounded-2xl border border-cyan-500/40 bg-[#0B1220] p-3">
             <Download className="h-6 w-6 shrink-0 text-cyan-400" />
@@ -148,7 +150,7 @@ export default function Dashboard() {
           <h2 className="font-display text-lg font-semibold text-white">Ringkasan</h2>
           <EyeToggle shown={shown} onToggle={() => setShown((s) => !s)} testid="dashboard-cost-eye-toggle" />
         </div>
-        <div className="grid grid-cols-2 gap-3" data-testid="dashboard-stats">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="dashboard-stats">
           <Stat icon={Package} label="Total Jenis Barang" value={items ? stats.total : "…"} testid="dashboard-stat-total" onClick={() => navigate("/barang")} />
           <Stat icon={TrendingUp} label="Potensi Keuntungan" accent="green" testid="dashboard-stat-profit" value={<Masked shown={shown}>{rupiah(stats.potential)}</Masked>} />
           <Stat icon={AlertTriangle} label="Stok Menipis" accent="amber" testid="dashboard-stat-low" value={stats.low} onClick={() => navigate("/barang?filter=menipis")}>
@@ -175,7 +177,7 @@ export default function Dashboard() {
             </button>
           </div>
           {recent && recent.length > 0 ? (
-            <div className="flex flex-col gap-2.5" data-testid="dashboard-recent-list">
+            <div className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-3" data-testid="dashboard-recent-list">
               {recent.map((r) => (
                 <button
                   key={r.id}

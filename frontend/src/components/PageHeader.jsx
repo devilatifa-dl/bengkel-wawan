@@ -6,7 +6,7 @@ export const PageHeader = ({ title, subtitle, back, right, testid = "page-header
   const navigate = useNavigate();
   return (
     <header data-testid={testid} className="sticky top-0 z-30 border-b border-slate-800 bg-[#0F172A]" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      <div className="flex min-h-[64px] items-center gap-2 px-4">
+      <div className="flex min-h-[64px] items-center gap-2 px-4 sm:px-6 lg:px-8">
         {back && (
           <button
             type="button"

@@ -10,6 +10,7 @@ import Settings from "./pages/Settings";
 import Scan from "./pages/Scan";
 import Labels from "./pages/Labels";
 import { BottomNav } from "./components/BottomNav";
+import { SideNav } from "./components/SideNav";
 import { seedIfNeeded } from "./lib/seed";
 import { prepareAll } from "./lib/aiStatus";
 import { runIndexer } from "./lib/indexer";
@@ -24,19 +25,23 @@ function Shell() {
   }, [loc.pathname]);
   return (
     <div className="min-h-screen bg-[#0B1220]">
-      <div className="relative mx-auto min-h-screen max-w-[480px] bg-[#0F172A] shadow-[0_0_60px_rgba(0,0,0,0.5)]">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/barang" element={<Inventory />} />
-          <Route path="/barang/baru" element={<ItemForm />} />
-          <Route path="/barang/:id" element={<ItemDetail />} />
-          <Route path="/barang/:id/edit" element={<ItemForm />} />
-          <Route path="/pengaturan" element={<Settings />} />
-          <Route path="/label" element={<Labels />} />
-          <Route path="/scan" element={<Scan initialMode="camera" />} />
-          <Route path="/cari" element={<Scan initialMode="manual" />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+      {/* Di HP: selebar layar. Di desktop: kanvas lebar dengan sidebar navigasi. */}
+      <div className="relative mx-auto min-h-screen w-full bg-[#0F172A] shadow-[0_0_60px_rgba(0,0,0,0.5)] lg:flex lg:max-w-[1280px] lg:shadow-none">
+        <SideNav hidden={fullScreen || isForm} />
+        <main className="min-w-0 flex-1 lg:border-l lg:border-slate-800/70">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/barang" element={<Inventory />} />
+            <Route path="/barang/baru" element={<ItemForm />} />
+            <Route path="/barang/:id" element={<ItemDetail />} />
+            <Route path="/barang/:id/edit" element={<ItemForm />} />
+            <Route path="/pengaturan" element={<Settings />} />
+            <Route path="/label" element={<Labels />} />
+            <Route path="/scan" element={<Scan initialMode="camera" />} />
+            <Route path="/cari" element={<Scan initialMode="manual" />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
         {!fullScreen && !isForm && <BottomNav />}
       </div>
     </div>
@@ -60,14 +65,16 @@ export default function App() {
       // lalu ulangi berkala dan setiap kali koneksi kembali.
       if (syncEnabled()) {
         const run = () => { if (!cancelled) syncNow(); };
-        setTimeout(run, 1500);
-        const timer = setInterval(run, 30000);
+        setTimeout(run, 1200);
+        const timer = setInterval(run, 15000);
         window.addEventListener("online", run);
         window.addEventListener("focus", run);
+        document.addEventListener("visibilitychange", run);
         return () => {
           clearInterval(timer);
           window.removeEventListener("online", run);
           window.removeEventListener("focus", run);
+          document.removeEventListener("visibilitychange", run);
         };
       }
     })();

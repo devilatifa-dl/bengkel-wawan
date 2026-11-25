@@ -147,7 +147,7 @@ export default function Labels() {
     <div data-testid="labels-page" className="pb-[calc(170px+env(safe-area-inset-bottom))]">
       <div className="no-print">
         <PageHeader back title="Cetak Label Harga" subtitle="Stiker harga untuk rak • kertas A4" />
-        <div className="space-y-4 px-4 pt-4">
+        <div className="space-y-4 px-4 pt-4 sm:px-6 lg:px-8">
           {/* Options */}
           <section className="rounded-2xl border border-slate-700/70 bg-[#1E293B] p-4" data-testid="labels-options">
             <div className="mb-2 text-sm font-semibold text-slate-200">Ukuran Label</div>
@@ -244,7 +244,7 @@ export default function Labels() {
         </div>
 
         {/* Action bar */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 mx-auto max-w-[480px] border-t border-slate-700 bg-[#0B1220] px-4 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
+        <div className="fixed bottom-0 left-0 right-0 z-40 mx-auto w-full border-t border-slate-700 bg-[#0B1220] px-4 pt-3 lg:hidden" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
           <div className="mb-2 flex items-center gap-2 text-sm text-slate-300" data-testid="labels-summary">
             <Tags className="h-4 w-4 text-amber-400" />
             {labels.length ? (

@@ -11,6 +11,7 @@ import { formatSize } from "../lib/match";
 import { takeDraft } from "../lib/draft";
 import { calcProfit, rupiah, percent } from "../lib/format";
 import { useBlobUrl, useSettings } from "../lib/hooks";
+import { syncNow } from "../lib/sync";
 import { SizeInput } from "../components/SizeInput";
 import { PageHeader } from "../components/PageHeader";
 import { MoneyInput } from "../components/MoneyInput";
@@ -193,6 +194,8 @@ export default function ItemForm() {
         editId
       );
       toast.success(editId ? "Perubahan disimpan" : "Barang baru tersimpan");
+      // Kirim segera ke server supaya perangkat lain langsung melihatnya.
+      syncNow().catch(() => {});
       navigate(`/barang/${newId}`, { replace: true });
     } catch (err) {
       toast.error("Gagal menyimpan: " + (err?.message || ""));
@@ -214,7 +217,7 @@ export default function ItemForm() {
   return (
     <div data-testid="product-form-page" className="pb-[calc(120px+env(safe-area-inset-bottom))]">
       <PageHeader back title={editId ? "Edit Barang" : "Tambah Barang Baru"} subtitle={fromScan ? "Foto & kode dari hasil scan sudah terisi" : "Data tersimpan offline di HP"} />
-      <form onSubmit={submit} className="flex flex-col gap-5 px-4 pt-4">
+      <form onSubmit={submit} className="flex flex-col gap-5 px-4 pt-4 sm:px-6 lg:px-8">
         {/* Photo */}
         <div className="flex flex-col gap-2">
           <span className="text-sm font-semibold text-slate-200">Foto Produk</span>
@@ -363,7 +366,7 @@ export default function ItemForm() {
         </div>
       </form>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 mx-auto max-w-[480px] border-t border-slate-700 bg-[#0B1220] px-4 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
+      <div className="fixed bottom-0 left-0 right-0 z-40 mx-auto w-full border-t border-slate-700 bg-[#0B1220] px-4 pt-3 sm:px-6 lg:px-8" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
         <button
           type="button"
           data-testid="product-form-save-button"

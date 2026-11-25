@@ -1,9 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
   "framework": null,
-  "buildCommand": "CI=false yarn build",
-  "outputDirectory": "build",
-  "installCommand": "yarn install --network-timeout 600000",
+  "installCommand": "cd frontend && yarn install --network-timeout 600000",
+  "buildCommand": "cd frontend && CI=false yarn build",
+  "outputDirectory": "frontend/build",
+  "functions": {
+    "api/index.py": {
+      "memory": 1024,
+      "maxDuration": 30,
+      "includeFiles": "backend/**"
+    }
+  },
   "headers": [
     {
       "source": "/models/(.*)",
@@ -16,14 +24,10 @@
     {
       "source": "/sw.js",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
-      ]
     }
   ],
-  "rewrites": [{ "source": "/((?!models/|static/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/((?!api/|models/|static/).*)", "destination": "/index.html" }
+  ]
 }
