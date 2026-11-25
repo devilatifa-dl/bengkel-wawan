@@ -1,6 +1,6 @@
 # Auto-Deploy — Setiap `git push` Langsung Online
 
-Auto-deploy **sudah aktif** lewat integrasi Git Vercel. Tidak ada langkah manual lagi.
+Auto-deploy **sudah aktif** lewat integrasi Git Vercel.
 
 ## Cara pakai
 
@@ -10,58 +10,69 @@ git commit -m "pesan perubahan"
 git push
 ```
 
-Selesai. Dalam ~1–3 menit perubahan langsung tampil di:
-
-| Bagian | URL produksi |
-|---|---|
-| Aplikasi (frontend) | https://bengkel-umber.vercel.app |
-| API (backend) | https://backend-phi-ashen-16.vercel.app |
+Selesai. Dalam ~2–4 menit perubahan langsung tampil di
+**https://bengkel-umber.vercel.app**
 
 ## Cara kerjanya
 
-Repo GitHub `devilatifa-dl/bengkel-wawan` terhubung ke **dua** project Vercel:
+Repo GitHub `devilatifa-dl/bengkel-wawan` terhubung ke **satu** project Vercel
+bernama `bengkel`. Satu project itu melayani dua hal sekaligus:
 
-| Project Vercel | Root directory | Yang di-deploy |
-|---|---|---|
-| `bengkel` | `frontend` | Aplikasi React (PWA) |
-| `backend` | `backend` | API FastAPI |
+| Path | Dilayani oleh |
+|---|---|
+| `/` dan halaman lain | React build dari `frontend/build` |
+| `/api/*` | FastAPI dari `api/index.py` → `backend/server.py` |
+| `/models/*`, `/static/*` | aset statis |
 
-Setiap push ke branch `main` memicu build di kedua project secara otomatis.
+Karena satu domain, frontend memanggil API lewat path relatif (`/api/...`).
+Tidak ada CORS dan tidak ada variabel `REACT_APP_BACKEND_URL`.
 
-### Konfigurasi frontend (project `bengkel`)
-- Framework: none
-- Install: `yarn install --network-timeout 600000`
-- Build: `CI=false yarn build`
-- Output: `build`
-- Env: `REACT_APP_BACKEND_URL`, `CI=false`, `GENERATE_SOURCEMAP=false`, `NODE_VERSION=20`
+### Konfigurasi project Vercel
 
-### Konfigurasi backend (project `backend`)
-- Framework: none
-- Root directory: `backend`
-- Entry: `backend/api/index.py` → `backend/server.py`
-- Env: `MONGO_URL`, `DB_NAME=bengkel`, `CORS_ORIGINS`
+| Setelan | Nilai |
+|---|---|
+| Root Directory | *(kosong — root repo)* |
+| Framework Preset | Other |
+| Install Command | `cd frontend && yarn install --network-timeout 600000` |
+| Build Command | `cd frontend && CI=false yarn build` |
+| Output Directory | `frontend/build` |
+
+Semua nilai di atas berasal dari `vercel.json` di root repo.
+
+### Environment Variables
+
+| Variabel | Nilai |
+|---|---|
+| `MONGO_URL` | connection string MongoDB Atlas |
+| `DB_NAME` | `bengkel` |
+| `CORS_ORIGINS` | `*` |
+| `CI` | `false` |
+| `GENERATE_SOURCEMAP` | `false` |
+| `NODE_VERSION` | `20` |
+
+`requirements.txt` di root dipakai Vercel untuk memasang dependensi Python.
 
 ## Memantau hasil deploy
 
 - Dashboard: https://vercel.com/latifadevii-2722/bengkel
-- Atau lewat CLI: `vercel ls bengkel`
+- CLI: `vercel ls bengkel`
+- Log fungsi: `vercel logs --deployment <url>`
 
-Kalau build gagal, Vercel tetap menyajikan versi terakhir yang sukses — aplikasi tidak mati.
+Kalau build gagal, Vercel tetap menyajikan versi terakhir yang sukses —
+aplikasi tidak mati.
 
 ## Deploy manual (cadangan)
-
-Kalau perlu deploy tanpa lewat Git:
 
 ```bat
 deploy.bat
 ```
 
-Script ini build frontend lalu upload ke Cloudflare Pages (`bengkel-wawan.pages.dev`).
-Berguna kalau Vercel sedang bermasalah.
+Script ini build frontend lalu upload ke Cloudflare Pages
+(`bengkel-wawan.pages.dev`). Berguna kalau Vercel sedang bermasalah, tapi
+situs Cloudflare itu **tidak** punya API sinkronisasi.
 
 ## Catatan
 
-- Cloudflare Pages (`bengkel-wawan.pages.dev`) masih ada sebagai cermin, tapi **tidak**
-  auto-deploy karena bertipe Direct Uploads. Vercel yang jadi jalur utama.
-- Jangan commit file `.env` — sudah masuk `.gitignore`. Variabel produksi diatur di
-  dashboard Vercel.
+- Jangan commit `.env` — sudah masuk `.gitignore`.
+- Cloudflare Pages (`bengkel-wawan.pages.dev`) hanya cermin statis, tidak
+  auto-deploy karena bertipe Direct Uploads.

@@ -1,13 +1,9 @@
 # Panduan Deploy
 
-> **Status: SUDAH LIVE**
-> - Aplikasi: https://bengkel-umber.vercel.app
-> - API: https://backend-phi-ashen-16.vercel.app
-> - Repo: https://github.com/devilatifa-dl/bengkel-wawan
->
+> **Status: SUDAH LIVE** — https://bengkel-umber.vercel.app
 > Auto-deploy aktif — lihat [AUTO-DEPLOY.md](./AUTO-DEPLOY.md).
 
-Arsitektur: **offline-first + sinkron**. Data utama di HP (IndexedDB), server hanya
+Arsitektur: **offline-first + sinkron**. Data utama di HP (IndexedDB), server
 menyimpan salinan supaya HP dan laptop melihat isi yang sama.
 
 ---
@@ -18,15 +14,14 @@ menyimpan salinan supaya HP dan laptop melihat isi yang sama.
 HP / Laptop (React PWA)
    │  IndexedDB  ← sumber kebenaran, tetap jalan tanpa internet
    │
-   ├── push/pull tiap 30 detik ──► Vercel Function (FastAPI)
+   ├── push/pull tiap 15 detik ──► Vercel Function (FastAPI)
    │                                    │
    └── service worker cache           └──► MongoDB Atlas (database `bengkel`)
 ```
 
 | Komponen | Host | Biaya |
 |---|---|---|
-| Frontend (React PWA) | Vercel — project `bengkel` | Gratis |
-| Backend (FastAPI) | Vercel — project `backend` | Gratis |
+| Frontend + API | Vercel — satu project `bengkel` | Gratis |
 | Database | MongoDB Atlas M0 | Gratis |
 | Model AI (18 MB) | ikut di bundle frontend | Gratis |
 
@@ -40,16 +35,14 @@ git commit -m "pesan perubahan"
 git push
 ```
 
-Vercel otomatis build & deploy frontend dan backend. Selesai.
+Vercel otomatis build & deploy. Selesai.
 
 ---
 
 ## Deploy manual (cadangan)
 
-### Frontend ke Vercel
+### Ke Vercel
 ```bash
-cd frontend
-yarn build
 vercel --prod
 ```
 
@@ -64,33 +57,25 @@ yarn build
 npx wrangler pages deploy build --project-name bengkel-wawan
 ```
 
-### Backend ke Vercel
-```bash
-cd backend
-vercel --prod
-```
+Catatan: situs Cloudflare hanya statis — **tidak** punya API sinkronisasi.
 
 ---
 
 ## Variabel lingkungan
 
-### Frontend (`frontend/.env` lokal, atau dashboard Vercel)
-| Variabel | Nilai |
-|---|---|
-| `REACT_APP_BACKEND_URL` | `https://backend-phi-ashen-16.vercel.app` |
-| `CI` | `false` |
-| `GENERATE_SOURCEMAP` | `false` |
-| `NODE_VERSION` | `20` |
+Diatur di dashboard Vercel (Settings → Environment Variables):
 
-`REACT_APP_BACKEND_URL` dibaca **saat build**. Kalau kosong, sinkronisasi mati dan
-aplikasi jadi offline-only.
-
-### Backend (`backend/.env` lokal, atau dashboard Vercel)
 | Variabel | Nilai |
 |---|---|
 | `MONGO_URL` | connection string MongoDB Atlas |
 | `DB_NAME` | `bengkel` |
-| `CORS_ORIGINS` | `*` atau domain frontend |
+| `CORS_ORIGINS` | `*` |
+| `CI` | `false` |
+| `GENERATE_SOURCEMAP` | `false` |
+| `NODE_VERSION` | `20` |
+
+`REACT_APP_BACKEND_URL` **tidak diperlukan** di produksi karena frontend dan API
+berada di domain yang sama. Variabel itu hanya dipakai saat pengembangan lokal.
 
 ---
 
@@ -125,11 +110,12 @@ secara berkala.
 
 | Masalah | Solusi |
 |---|---|
-| Build gagal `Cannot find module` | Root directory harus `frontend` (project `bengkel`) atau `backend` (project `backend`) |
-| Panel sinkron menampilkan "Tidak terhubung" | Cek `REACT_APP_BACKEND_URL` sudah diisi saat build; cek `/api/health` backend |
-| Backend 404 di semua route | Pastikan `framework` project Vercel = none, bukan `fastapi` |
-| Backend 500 `FUNCTION_INVOCATION_FAILED` | Root directory project `backend` harus `backend`, bukan kosong |
-| Kamera tidak muncul | Wajib HTTPS atau `localhost` |
-| Halaman 404 saat refresh | `frontend/vercel.json` harus punya rewrite ke `/index.html` |
-| AI lambat pertama kali | Normal — mengunduh 18 MB model. Berikutnya instan dari cache |
+| API 500 `ModuleNotFoundError` | Pastikan `requirements.txt` ada di **root** repo |
+| API 404 di semua route | `vercel.json` harus punya rewrite `/api/(.*)` → `/api/index` |
+| Panel sinkron "Tidak terhubung" | Cek `/api/health`; pastikan `MONGO_URL` terpasang di Vercel |
 | Data tidak muncul di perangkat lain | Tekan **Sinkronkan Sekarang** di kedua perangkat |
+| Barang contoh menumpuk duplikat | Seed hanya jalan bila server kosong; hapus duplikat lewat Pengaturan |
+| Kamera tidak muncul | Wajib HTTPS atau `localhost` |
+| Halaman 404 saat refresh | `vercel.json` harus punya rewrite ke `/index.html` |
+| AI lambat pertama kali | Normal — mengunduh 18 MB model. Berikutnya instan dari cache |
+| Tampilan lama masih muncul | Service worker cache. Naikkan `VERSION` di `frontend/public/sw.js` |

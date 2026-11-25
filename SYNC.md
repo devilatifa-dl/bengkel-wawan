@@ -1,63 +1,73 @@
 # Sinkronisasi Antar Perangkat
 
-Aplikasi ini **tetap offline-first** (data disimpan di IndexedDB perangkat), tetapi juga
-mengirim salinan ke server agar **HP dan laptop melihat data yang sama**.
+Data tetap **offline-first**: IndexedDB di HP/laptop adalah sumber utama.
+Server hanya menyimpan salinan agar semua perangkat melihat isi yang sama.
 
-## Cara kerja
+## Alur
 
 ```
-HP (IndexedDB)  ??push???  API Vercel  ???  MongoDB Atlas (database: bengkel)
-      ?                        ?
-      ?????????pull?????????????
-Laptop (IndexedDB)
+HP (IndexedDB)  ──push──►  Vercel Function (FastAPI)  ──►  MongoDB Atlas
+      ▲                │                                        (database `bengkel`)
+      └──pull────────┘
 ```
 
-- **Push**: setiap item yang `updatedAt`-nya lebih baru dari sinkron terakhir dikirim ke server.
-- **Pull**: item dari perangkat lain ditarik dan disimpan ke IndexedDB.
-- **Konflik**: last-write-wins berdasarkan `updatedAt` (epoch ms). Data yang lebih lama diabaikan.
-- **Hapus**: memakai soft delete (`deleted: true`) agar penghapusan ikut tersinkron.
-- **Offline**: bila server tidak terjangkau, aplikasi tetap jalan normal. Sinkron dicoba lagi
-  setiap 30 detik, saat koneksi kembali, dan saat tab kembali fokus.
+Frontend dan API berada di **domain yang sama** (`bengkel-umber.vercel.app`),
+jadi tidak ada CORS dan tidak perlu variabel `REACT_APP_BACKEND_URL`.
 
 ## Kapan sinkron berjalan
 
-| Pemicu | Waktu |
+| Pemicu | Keterangan |
 |---|---|
-| Aplikasi dibuka | 1,5 detik setelah load |
-| Berkala | Setiap 30 detik |
-| Koneksi kembali | Event `online` |
-| Tab kembali aktif | Event `focus` |
-| Manual | Pengaturan ? Sinkron Antar Perangkat ? **Sinkronkan Sekarang** |
+| Aplikasi dibuka | 1,2 detik setelah halaman siap |
+| Setiap 15 detik | Selama aplikasi terbuka |
+| Setelah simpan barang | Langsung, tanpa menunggu timer |
+| Koneksi kembali online | Event `online` |
+| Tab kembali aktif | Event `focus` dan `visibilitychange` |
+| Tombol **Sinkronkan Sekarang** | Di halaman Pengaturan |
 
-## Konfigurasi
+## Endpoint
 
-### Frontend (build-time)
-```
-REACT_APP_BACKEND_URL=https://<project-backend>.vercel.app
-```
-Diisi sebagai **GitHub Secret** agar GitHub Actions memakainya saat build.
+| Endpoint | Fungsi |
+|---|---|
+| `GET /api/health` | Cek koneksi database |
+| `GET /api/sync/pull?since=<seq>` | Ambil item yang berubah setelah `seq` |
+| `POST /api/sync/push` | Kirim perubahan lokal |
+| `GET /api/sync/stats` | Jumlah barang di server |
 
-### Backend (Vercel Environment Variables)
-```
-MONGO_URL=mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority
-DB_NAME=bengkel
-CORS_ORIGINS=*
-```
+## Dua konsep waktu yang berbeda
 
-## Endpoint API
+Ini bagian paling penting dan pernah jadi sumber bug.
 
-| Method | Path | Fungsi |
+| Field | Sumber | Dipakai untuk |
 |---|---|---|
-| GET | `/api/health` | Cek koneksi database |
-| GET | `/api/sync/pull?since=<ms>` | Ambil item yang berubah setelah `since` + semua pengaturan |
-| POST | `/api/sync/push` | Kirim item lokal + pengaturan |
-| GET | `/api/sync/stats` | Jumlah item di server |
+| `updatedAt` | jam perangkat (epoch ms) | menentukan data mana yang menang (last-write-wins) |
+| `seq` | nomor urut dari server | cursor tarik data |
 
-## Catatan penting
+**Kenapa cursor tidak memakai `updatedAt`?**
+Jam HP dan laptop bisa berbeda beberapa menit. Kalau HP menyimpan barang dengan
+`updatedAt` 10:00 sementara laptop sudah menarik data sampai 10:05, barang itu
+tidak akan pernah tertarik — hilang selamanya.
 
-- **Database terpisah**: memakai cluster Atlas yang sama dengan project perpus, tetapi
-  `DB_NAME=bengkel` ? data perpus tidak tersentuh.
-- **Foto** dikirim sebagai data URL base64. Untuk ratusan barang berfoto, ukuran payload bisa
-  besar; sinkron berjalan bertahap (maks 500 item per permintaan).
-- **Tanpa login**: siapa pun yang tahu URL API bisa membaca data. Untuk pemakaian pribadi
-  ini biasanya cukup, tetapi jangan bagikan URL backend ke publik.
+`seq` selalu naik di server, jadi setiap perubahan pasti terlihat oleh perangkat
+lain pada tarikan berikutnya, berapa pun jam perangkatnya.
+
+## Penghapusan
+
+Hapus barang memakai **soft delete** (`deleted: true`). Baris tetap ada di server
+agar penghapusan ikut tersinkron. Semua halaman memakai `liveItems()` sehingga
+barang terhapus tidak tampil.
+
+## Barang contoh
+
+Seed 6 barang contoh hanya berjalan bila **server belum punya data**. Tanpa aturan
+ini setiap perangkat baru (HP, laptop, browser lain) menanam 6 contoh lalu
+mengirimnya ke server sehingga daftar menumpuk duplikat.
+
+## Batasan
+
+- Foto dikirim sebagai data URL base64. Batas body request Vercel 4,5 MB, jadi
+  foto sudah dikompres di sisi klien sebelum disimpan.
+- Tarik data dibatasi 500 item per request; klien mengulang otomatis bila
+  `more: true`.
+- Konflik antar perangkat diselesaikan dengan last-write-wins, bukan merge per
+  field. Hindari mengedit barang yang sama di dua perangkat bersamaan.
