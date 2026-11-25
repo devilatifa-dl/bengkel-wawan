@@ -1,4 +1,5 @@
 import { db, getSetting, setSetting, saveItem } from "./db";
+import { syncEnabled, syncStatus } from "./sync";
 
 const SAMPLES = [
   { key: "kampas-rem", name: "Kampas Rem Depan", partCode: "06455-KVB-305", brand: "Honda AHM", compatibility: "Beat, Vario 110, Scoopy", costPrice: 35000, sellPrice: 55000, stock: 12 },
@@ -25,6 +26,20 @@ export function seedIfNeeded() {
     if (count > 0) {
       await setSetting("seeded", true);
       return false;
+    }
+    // Jangan menanam contoh kalau server sudah punya data. Tanpa cek ini setiap
+    // perangkat baru (HP, laptop, browser lain) menanam 6 contoh lalu mengirimnya
+    // ke server sehingga daftar barang menumpuk duplikat.
+    if (syncEnabled()) {
+      try {
+        const st = await syncStatus();
+        if (st.online && Number(st.items || 0) > 0) {
+          await setSetting("seeded", true);
+          return false;
+        }
+      } catch (e) {
+        /* offline: biarkan menanam contoh lokal */
+      }
     }
     for (const s of SAMPLES) {
       let photo = null;
