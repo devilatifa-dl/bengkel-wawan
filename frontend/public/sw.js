@@ -1,5 +1,5 @@
 /* Service Worker — Bengkel & Toko Sparepart Motor (offline-first) */
-const VERSION = "v1.2.0";
+const VERSION = "v1.3.0";
 const SHELL_CACHE = `shell-${VERSION}`;
 const MODEL_CACHE = "models-v2"; // large AI assets, kept across app versions
 const RUNTIME_CACHE = `runtime-${VERSION}`;
